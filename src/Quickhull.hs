@@ -3,6 +3,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RebindableSyntax  #-}
 {-# LANGUAGE TypeOperators     #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+{-# HLINT ignore "Use guards" #-}
 
 module Quickhull (
 
@@ -96,13 +98,57 @@ initialPartition points =
           count = fold (+) 0 isLower'
 
       destination :: Acc (Vector (Maybe DIM1))
-      destination = error "TODO: compute the index in the result array for each point (if it is present)"
+      destination = zipWith4 calcIndex isUpper isLower offsetUpper offsetLower --because were using acc it knows the index. We zip the four arrays we need and we can calculate the new one using the index from Acc
+        where
+          totalUpperPoints = the countUpper --to prevent type issues. Countupper is technically an acc and we need the raw value
+
+          calcIndex :: Exp Bool -> Exp Bool -> Exp Int -> Exp Int -> Exp (Maybe DIM1)
+          calcIndex upperPoints lowerPoints upperOffset lowerOffset =
+            if upperPoints
+              then lift (Just (Z :. upperOffset + 1)) -- +1 because we have to start (and end) the partition with p1 as the excercise says. Dont know why, but doing it anyway
+              else if lowerPoints
+                then lift (Just (Z :. lowerOffset + totalUpperPoints + 2 )) --we have the loweroffset, plus the total amount of upperpoints, plus 2 for p1 and p2 on the line
+                else lift (Nothing :: Maybe DIM1)
 
       newPoints :: Acc (Vector Point)
-      newPoints = error "TODO: place each point into its corresponding segment of the result"
+      newPoints = permute const defaults (destination !) points --build a new array within defaults by taking all points and moving them to their destination index
+        where
+          totalUpper = the countUpper
+          totalLower = the countLower
 
-      headFlags :: Acc (Vector Bool)
-      headFlags = error "TODO: create head flags array demarcating the initial segments"
+          arrayLength = totalUpper + totalLower + 3 --plus three because the assignment says to put p1 at the start and end and p2 in the middle
+
+          defaults = generate (I1 arrayLength) check
+            where
+              check :: Exp DIM1 -> Exp Point
+              check ix = result
+                where
+                  Z :. i = unlift ix
+
+                  result = --just a small hardcoded check for placing p1 and p2 in the right places
+                    if i == 0 || i == (totalUpper + totalLower + 2)
+                      then p1
+                      else if i == (totalUpper + 1)
+                        then p2
+                        else lift ((0,0) :: Point) --placeholder. Will get overwritten
+
+      headFlags :: Acc (Vector Bool) --pretty much the same logic as for making the newpoints array. We just place a True at p1 and p2 and p1 again, and false everywhere else.
+      headFlags = generate (I1 arrayLength) check
+            where
+              totalUpper = the countUpper
+              totalLower = the countLower
+
+              arrayLength = totalUpper + totalLower + 3
+
+              check :: Exp DIM1 -> Exp Bool
+              check ix = result
+                where
+                  Z :. i = unlift ix
+
+                  result =
+                    if i == 0 || i == (totalUpper + 1) || i == (totalUpper + totalLower + 2)
+                      then lift (True :: Bool)
+                      else lift (False :: Bool)
   in
   T2 headFlags newPoints
 
