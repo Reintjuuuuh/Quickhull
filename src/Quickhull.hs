@@ -69,20 +69,31 @@ initialPartition points =
         where
           line = T2 p1 p2
 
-      isLower :: Acc (Vector Bool)
-      isLower = map (pointIsLeftOfLine line) points
+      isLower :: Acc (Vector Bool) --first i tried map not isUpper, but i dont think this is right cuz points already on the convex hull shouldnt be placed in either partition and this way they do have that
+      isLower = map (pointIsLeftOfLine line) points --using helper function
         where
           line = T2 p2 p1
         
-      --first i tried map not isUpper, but i dont think this is right cuz points already on the convex hull shouldnt be placed in either partition and this way they do have that
-
+      
       offsetUpper :: Acc (Vector Int)
       countUpper  :: Acc (Scalar Int)
-      T2 offsetUpper countUpper = error "TODO: number of points above the line and their relative index"
+      T2 offsetUpper countUpper = T2 offset count --we combine the offsets and total count as a tuple with T2
+        where
+          isUpper' = map (\a -> if a then 1 else 0) isUpper --need to convert all Trues and Falses to 1's and 0's
+
+          array = scanl (+) 0 isUpper' --scan to build up an array
+          offset = init array --delete the last element
+          count = fold (+) 0 isUpper' --fold to count the total as one number
 
       offsetLower :: Acc (Vector Int)
       countLower  :: Acc (Scalar Int)
-      T2 offsetLower countLower = error "TODO: number of points below the line and their relative index"
+      T2 offsetLower countLower = T2 offset count --pretty much the same as the function above, just for the lower points
+        where
+          isLower' = map (\a -> if a then 1 else 0) isLower
+
+          array = scanl (+) 0 isLower'
+          offset = init array
+          count = fold (+) 0 isLower'
 
       destination :: Acc (Vector (Maybe DIM1))
       destination = error "TODO: compute the index in the result array for each point (if it is present)"
