@@ -140,7 +140,16 @@ propagateR = error "TODO: propagateR"
 -- should be:
 -- Vector (Z :. 6) [False,False,True,False,True,True]
 shiftHeadFlagsL :: Acc (Vector Bool) -> Acc (Vector Bool)
-shiftHeadFlagsL = error "TODO: shiftHeadFlagsL"
+shiftHeadFlagsL mat = backpermute (shape mat) getIndex mat
+  where
+    getIndex :: Exp DIM1 -> Exp DIM1
+    getIndex ix = lift (Z :. sourceIndex)
+      where
+        Z :. i = unlift ix
+
+        len = length mat
+
+        sourceIndex = if i == (len - 1) then i else i + 1
 
 -- >>> import Data.Array.Accelerate.Interpreter
 -- >>> run $ shiftHeadFlagsR (use (fromList (Z :. 6) [True,False,False,True,False,False]))
@@ -148,7 +157,14 @@ shiftHeadFlagsL = error "TODO: shiftHeadFlagsL"
 -- should be:
 -- Vector (Z :. 6) [True,True,False,False,True,False]
 shiftHeadFlagsR :: Acc (Vector Bool) -> Acc (Vector Bool)
-shiftHeadFlagsR = error "TODO: shiftHeadFlagsR"
+shiftHeadFlagsR mat = backpermute (shape mat) getIndex mat
+  where
+    getIndex :: Exp DIM1 -> Exp DIM1
+    getIndex ix = lift (Z :. sourceIndex)
+      where
+        Z :. i = unlift ix
+
+        sourceIndex = if i == 0 then i else i - 1
 
 -- >>> import Data.Array.Accelerate.Interpreter
 -- >>> let flags  = fromList (Z :. 9) [True,False,False,True,True,False,False,False,True]
