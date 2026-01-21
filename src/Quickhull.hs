@@ -60,14 +60,21 @@ initialPartition :: Acc (Vector Point) -> Acc SegmentedPoints
 initialPartition points =
   let
       p1, p2 :: Exp Point
-      p1 = error "TODO: locate the left-most point"
-      p2 = error "TODO: locate the right-most point"
+      p1 = the (fold1 (\point1@(T2 x1 _) point2@(T2 x2 _) -> if x1 < x2 then point1 else point2) points) --weird lambda function that compares two points and picks the one with the lowest x value. "the" is needed for type issues.
+      p2 = the (fold1 (\point1@(T2 x1 _) point2@(T2 x2 _) -> if x1 > x2 then point1 else point2) points)
 
       isUpper :: Acc (Vector Bool)
-      isUpper = error "TODO: determine which points lie above the line (p₁, p₂)"
+      isUpper = map (pointIsLeftOfLine line) points
+      --fold1 (\p acc -> pointIsLeftOfLine line p : acc) points --other try but not correct. Map is much easier xD
+        where
+          line = T2 p1 p2
 
       isLower :: Acc (Vector Bool)
-      isLower = error "TODO: determine which points lie below the line (p₁, p₂)"
+      isLower = map (pointIsLeftOfLine line) points
+        where
+          line = T2 p2 p1
+        
+      --first i tried map not isUpper, but i dont think this is right cuz points already on the convex hull shouldnt be placed in either partition and this way they do have that
 
       offsetUpper :: Acc (Vector Int)
       countUpper  :: Acc (Scalar Int)
