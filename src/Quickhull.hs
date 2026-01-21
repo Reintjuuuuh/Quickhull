@@ -126,7 +126,7 @@ propagateL flagsMat valuesMat = map snd scannedElements --return all second elem
   where
     combined = zip flagsMat valuesMat
 
-    scannedElements = scanl1 pickElement combined --scnal1 gives two elements. The accumulator and the current value that is being 
+    scannedElements = scanl1 pickElement combined --scnal1 gives two elements. The accumulator and the current value that is being evaluated
 
     pickElement :: Elt a => Exp (Bool, a) -> Exp (Bool, a) -> Exp (Bool, a)
     pickElement (T2 flagAcc valAcc) (T2 flagEval valEval) = if flagEval then (T2 flagEval valEval) else (T2 flagAcc valAcc) --if the flag of the tuple we are currently evaluating is true, we have found a new segment and return this new segment. Otherwise we return the accumulator (which copies the last known true flag)
@@ -139,7 +139,14 @@ propagateL flagsMat valuesMat = map snd scannedElements --return all second elem
 -- should be:
 -- Vector (Z :. 9) [1,4,4,4,5,9,9,9,9]
 propagateR :: Elt a => Acc (Vector Bool) -> Acc (Vector a) -> Acc (Vector a)
-propagateR = error "TODO: propagateR"
+propagateR flagsMat valuesMat = map snd scannedElements --return all second elements of scannedElements. This ignores the flags and just returns the values.
+  where
+    combined = zip flagsMat valuesMat
+
+    scannedElements = scanr1 pickElement combined --DIFFERENCE FROM SCANL1 is that the accumulator and evaluated tuple are switched
+
+    pickElement :: Elt a => Exp (Bool, a) -> Exp (Bool, a) -> Exp (Bool, a)
+    pickElement (T2 flagEval valEval) (T2 flagAcc valAcc) = if flagEval then (T2 flagEval valEval) else (T2 flagAcc valAcc) --if the flag of the tuple we are currently evaluating is true, we have found a new segment and return this new segment. Otherwise we return the accumulator (which copies the last known true flag)
 
 -- >>> import Data.Array.Accelerate.Interpreter
 -- >>> run $ shiftHeadFlagsL (use (fromList (Z :. 6) [False,False,False,True,False,True]))
