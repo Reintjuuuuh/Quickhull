@@ -203,13 +203,16 @@ partition (T2 headFlags points) = undefined
     upperLocalID = segmentedScanl1 (+) headFlags (map boolToInt isUpper)
     lowerLocalID = segmentedScanl1 (+) headFlags (map boolToInt isLower)
 
-    undecidedPoints = zipWith4 func p1s p2s realMaximum points 
-      where
-        func :: Exp Point -> Exp Point -> Exp Point -> Exp Point -> Exp Bool
-        func p1 p2 p3 p = 
-          if pointIsLeftOfLine (T2 p1 p3) p || pointIsLeftOfLine (T2 p3 p2) p
-            then lift (True :: Bool)
-            else lift (False :: Bool)
+    upperCounts = propagateL headFlags (segmentedScanr1 (+) headFlags (map boolToInt isUpper)) 
+    lowerCounts = propagateL headFlags (segmentedScanr1 (+) headFlags (map boolToInt isLower))
+
+    -- undecidedPoints = zipWith4 func p1s p2s realMaximum points 
+    --   where
+    --     func :: Exp Point -> Exp Point -> Exp Point -> Exp Point -> Exp Bool
+    --     func p1 p2 p3 p = 
+    --       if pointIsLeftOfLine (T2 p1 p3) p || pointIsLeftOfLine (T2 p3 p2) p
+    --         then lift (True :: Bool)
+    --         else lift (False :: Bool)
 
     --now all points with True still need to be handled. We do this by partitioning again.
 
