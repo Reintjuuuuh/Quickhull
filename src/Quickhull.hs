@@ -140,23 +140,23 @@ propagateR = error "TODO: propagateR"
 -- should be:
 -- Vector (Z :. 6) [False,False,True,False,True,True]
 shiftHeadFlagsL :: Acc (Vector Bool) -> Acc (Vector Bool)
-shiftHeadFlagsL mat = backpermute (shape mat) getIndex mat
+shiftHeadFlagsL mat = backpermute (shape mat) getIndex mat --backpermute is like a shuffle for a matrix, so it just creates a new matrix using a function that says at what index of the matrix it should get its data from
   where
     getIndex :: Exp DIM1 -> Exp DIM1
-    getIndex ix = lift (Z :. sourceIndex)
+    getIndex ix = lift (Z :. sourceIndex) --we return a new index; the index where the data should come from
       where
         Z :. i = unlift ix
 
         len = length mat
 
-        sourceIndex = if i == (len - 1) then i else i + 1
+        sourceIndex = if i == (len - 1) then i else i + 1 --the index is pretty much the next index (because we're shifting left, we need to look at the +1 index from the original array). If the index gets out of bounds it just copies the last index
 
 -- >>> import Data.Array.Accelerate.Interpreter
 -- >>> run $ shiftHeadFlagsR (use (fromList (Z :. 6) [True,False,False,True,False,False]))
 --
 -- should be:
 -- Vector (Z :. 6) [True,True,False,False,True,False]
-shiftHeadFlagsR :: Acc (Vector Bool) -> Acc (Vector Bool)
+shiftHeadFlagsR :: Acc (Vector Bool) -> Acc (Vector Bool) --see shiftL
 shiftHeadFlagsR mat = backpermute (shape mat) getIndex mat
   where
     getIndex :: Exp DIM1 -> Exp DIM1
@@ -164,7 +164,7 @@ shiftHeadFlagsR mat = backpermute (shape mat) getIndex mat
       where
         Z :. i = unlift ix
 
-        sourceIndex = if i == 0 then i else i - 1
+        sourceIndex = if i == 0 then i else i - 1 --see shiftL, with the difference that we copy the first element instead of the last for shifting right
 
 -- >>> import Data.Array.Accelerate.Interpreter
 -- >>> let flags  = fromList (Z :. 9) [True,False,False,True,True,False,False,False,True]
