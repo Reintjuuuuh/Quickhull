@@ -75,7 +75,6 @@ initialPartition points =
       isLower = map (pointIsLeftOfLine line) points --using helper function
         where
           line = T2 p2 p1
-        
       
       offsetUpper :: Acc (Vector Int)
       countUpper  :: Acc (Scalar Int)
@@ -163,8 +162,65 @@ initialPartition points =
 -- These points are undecided.
 --
 partition :: Acc SegmentedPoints -> Acc SegmentedPoints
-partition (T2 headFlags points) =
-  error "TODO: partition"
+partition (T2 headFlags points) = undefined
+  where    
+    p1s = propagateL headFlags points
+    p2s = propagateR headFlags points
+    --now we have for every point the line to which they should calculate their distance
+    
+    distancesToLine :: Acc (Vector Int)
+    distancesToLine = zipWith3 func p1s p2s points
+      where
+        func :: Exp Point -> Exp Point -> Exp Point -> Exp Int
+        func p1 p2 = nonNormalizedDistance (T2 p1 p2)
+    --distances is the non normalized distance to their respective line. Now we need to scan each segment with a function that looks for the max distance
+    
+    distancesToPoint :: Acc (Vector Int)
+    distancesToPoint = zipWith func p1s points
+      where
+        func :: Exp Point -> Exp Point -> Exp Int
+        func (T2 x1 y1) (T2 x y) = (x - x1) * (x - x1) + (y - y1) * (y - y1)
+
+    tempMaximum = segmentedScanr1 func headFlags (zip3 distancesToLine points distancesToPoint)
+      where
+        func :: Exp (Int, Point, Int) -> Exp (Int, Point, Int) -> Exp (Int, Point, Int)
+        func p1@(T3 d1 _ dp1) p2@(T3 d2 _ dp2) = if d1 > d2 || (d1 == d2 && dp1 < dp2) then p1 else p2 
+
+    realMaximum = map (\(T3 _ p _) -> p) (propagateL headFlags tempMaximum) --now every point knows the furthest point in their segment
+
+    --we now have, for every point, the p1 and p2 in their segment (line) and the furthest away point in their segment.
+
+    isUpper = zipWith3 func p1s realMaximum points
+      where
+        func :: Exp Point -> Exp Point -> Exp Point -> Exp Bool
+        func p1 p3 = pointIsLeftOfLine (T2 p1 p3) 
+
+    isLower = zipWith3 func p2s realMaximum points
+      where
+        func :: Exp Point -> Exp Point -> Exp Point -> Exp Bool
+        func p2 p3 = pointIsLeftOfLine (T2 p3 p2) 
+
+    upperLocalID = segmentedScanl1 (+) headFlags (map boolToInt isUpper)
+    lowerLocalID = segmentedScanl1 (+) headFlags (map boolToInt isLower)
+
+    undecidedPoints = zipWith4 func p1s p2s realMaximum points 
+      where
+        func :: Exp Point -> Exp Point -> Exp Point -> Exp Point -> Exp Bool
+        func p1 p2 p3 p = 
+          if pointIsLeftOfLine (T2 p1 p3) p || pointIsLeftOfLine (T2 p3 p2) p
+            then lift (True :: Bool)
+            else lift (False :: Bool)
+
+    --now all points with True still need to be handled. We do this by partitioning again.
+
+
+
+
+  --error "TODO: partition"
+  --we have initial partition with p1 to p2 and p2 to p1. 
+  --For both parts we calculate the point furthest from the line using nonNormalizedDistance
+  --Then pretty much copy the logic of the initial partition
+
 
 
 -- The completed algorithm repeatedly partitions the points until there are
