@@ -121,7 +121,7 @@ quickhull =
 --
 -- should be:
 -- Vector (Z :. 9) [1,1,1,4,5,5,5,5,9]
-propagateL :: Elt a => Acc (Vector Bool) -> Acc (Vector a) -> Acc (Vector a)
+propagateL :: Elt a => Acc (Vector Bool) -> Acc (Vector a) -> Acc (Vector a) --NOTE: i think (later realization) that i can use the segmentedscan to make this work better. Might try to implement later but for now this works
 propagateL flagsMat valuesMat = map snd scannedElements --return all second elements of scannedElements. This ignores the flags and just returns the values.
   where
     combined = zip flagsMat valuesMat
@@ -138,7 +138,7 @@ propagateL flagsMat valuesMat = map snd scannedElements --return all second elem
 --
 -- should be:
 -- Vector (Z :. 9) [1,4,4,4,5,9,9,9,9]
-propagateR :: Elt a => Acc (Vector Bool) -> Acc (Vector a) -> Acc (Vector a)
+propagateR :: Elt a => Acc (Vector Bool) -> Acc (Vector a) -> Acc (Vector a) 
 propagateR flagsMat valuesMat = map snd scannedElements --return all second elements of scannedElements. This ignores the flags and just returns the values.
   where
     combined = zip flagsMat valuesMat
@@ -193,7 +193,11 @@ shiftHeadFlagsR mat = backpermute (shape mat) getIndex mat
 -- non-associative combination functions may seem to work fine here -- only to
 -- fail spectacularly when testing with a parallel backend on larger inputs. ;)
 segmentedScanl1 :: Elt a => (Exp a -> Exp a -> Exp a) -> Acc (Vector Bool) -> Acc (Vector a) -> Acc (Vector a)
-segmentedScanl1 = error "TODO: segmentedScanl1"
+segmentedScanl1 func flagsMat valuesMat = map snd scannedElements --return all second elements of scannedElements. This ignores the flags and just returns the values.
+  where
+    combined = zip flagsMat valuesMat
+
+    scannedElements = scanl1 (segmented func) combined --we use helper function segmented which already has the logic for looking if the flag is true or not.
 
 -- >>> import Data.Array.Accelerate.Interpreter
 -- >>> let flags  = fromList (Z :. 9) [True,False,False,True,True,False,False,False,True]
@@ -204,8 +208,11 @@ segmentedScanl1 = error "TODO: segmentedScanl1"
 -- >>> fromList (Z :. 9) [1, 2+3+4, 3+4, 4, 5, 6+7+8+9, 7+8+9, 8+9, 9] :: Vector Int
 -- Vector (Z :. 9) [1,9,7,4,5,30,24,17,9]
 segmentedScanr1 :: Elt a => (Exp a -> Exp a -> Exp a) -> Acc (Vector Bool) -> Acc (Vector a) -> Acc (Vector a)
-segmentedScanr1 = error "TODO: segmentedScanr1"
+segmentedScanr1 func flagsMat valuesMat = map snd scannedElements --return all second elements of scannedElements. This ignores the flags and just returns the values.
+  where
+    combined = zip flagsMat valuesMat
 
+    scannedElements = scanr1 (segmented func) combined --we use helper function segmented which already has the logic for looking if the flag is true or not.
 
 -- Given utility functions
 -- -----------------------
