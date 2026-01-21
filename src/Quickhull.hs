@@ -122,7 +122,14 @@ quickhull =
 -- should be:
 -- Vector (Z :. 9) [1,1,1,4,5,5,5,5,9]
 propagateL :: Elt a => Acc (Vector Bool) -> Acc (Vector a) -> Acc (Vector a)
-propagateL = error "TODO: propagateL"
+propagateL flagsMat valuesMat = map snd scannedElements --return all second elements of scannedElements. This ignores the flags and just returns the values.
+  where
+    combined = zip flagsMat valuesMat
+
+    scannedElements = scanl1 pickElement combined --scnal1 gives two elements. The accumulator and the current value that is being 
+
+    pickElement :: Elt a => Exp (Bool, a) -> Exp (Bool, a) -> Exp (Bool, a)
+    pickElement (T2 flagAcc valAcc) (T2 flagEval valEval) = if flagEval then (T2 flagEval valEval) else (T2 flagAcc valAcc) --if the flag of the tuple we are currently evaluating is true, we have found a new segment and return this new segment. Otherwise we return the accumulator (which copies the last known true flag)
 
 -- >>> import Data.Array.Accelerate.Interpreter
 -- >>> let flags  = fromList (Z :. 9) [True,False,False,True,True,False,False,False,True]
