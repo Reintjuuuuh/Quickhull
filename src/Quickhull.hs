@@ -175,7 +175,7 @@ partition (T2 headFlags points) = T2 newFlags newPoints
         func p1 p2 = nonNormalizedDistance (T2 p1 p2)
     --distances is the non normalized distance to their respective line. Now we need to scan each segment with a function that looks for the max distance
     
-    distancesToPoint :: Acc (Vector Int)
+    distancesToPoint :: Acc (Vector Int) --we need this for tiebreakers when the distance is the same. 
     distancesToPoint = zipWith func p1s points
       where
         func :: Exp Point -> Exp Point -> Exp Int
@@ -233,9 +233,45 @@ partition (T2 headFlags points) = T2 newFlags newPoints
     upperCounts = propagateL headFlags (segmentedScanr1 (+) headFlags (map boolToInt upperKeep)) --for the offset
     lowerCounts = propagateL headFlags (segmentedScanr1 (+) headFlags (map boolToInt lowerKeep))
 
-    newFlags = undefined
-    newPoints = undefined
+    segmentSizes = zipWith4 func headFlags upperCounts lowerCounts isActive --same for lower
+      where
+        func :: Exp Bool -> Exp Int -> Exp Int -> Exp Bool -> Exp Int
+        func hf uppercount lowercount act = if hf then 1 + uppercount + lowercount + boolToInt act else 0 --we store the size of every segment at the headflag position. Sizes are 1 for the headflag plus the number of upper and lower points, and depending on if the segment is active an extra for the p3 (farthest point from the line)
 
+    segmentBase = propagateL headFlags (init (scanl (+) 0 segmentSizes))
+
+    destination :: Acc (Vector (Maybe DIM1)) --an insane amalgamation of everything we calculated so far. We use pretty much all arrays to calculate the new index for every point
+    destination = generate (shape points) $ \ix ->
+      let
+        hf = headFlags ! ix
+        up = upperKeep ! ix
+        low = lowerKeep ! ix
+        isFurtherst = isFurthestPoint ! ix
+        
+        base = segmentBase ! ix
+        uID = upperLocalID ! ix
+        lID = lowerLocalID ! ix
+        totalUpper = upperCounts ! ix
+
+        keep = hf || up || low || isFurtherst --we decide to keep the point if it is a headflag, part of the lower of upper points, or a point on the hull (furthest). All other points are inside the hull and we can discard
+
+        local = if hf then 0 --We calculate the local id of the point for their own segment. If it is the headflag of the segment its index is 0
+                else if up then uID --if it is part of the upper points that still need to be handled we assign it its upperid
+                else if isFurtherst then totalUpper + 1 --if it is the triangle point(?) then it gets placed exactly between the upper and lower points, so the total amount of upper points + 1
+                else totalUpper + lID + 1 --else it is a lower point and we place it on the offset of the total amount of upper points, plus one for the furthest point, plus its own local lower id
+      in
+        if keep then Just_ (I1 (base + local)) else Nothing_ --if we keep the point we return the base offset plus the local offset, otherwise nothing.
+          
+    
+    totalLength = the (fold (+) 0 segmentSizes) --we add up all seperate segmentsizes to calculate the total array size.
+
+    defaultPointsArray = generate (I1 totalLength) (\_ -> T2 0 0) --we fill a default array with the total length with placeholder points
+    defaultFlagsArray = generate (I1 totalLength) (\_ -> False_) --placeholder flag values
+
+    newPoints = permute const defaultPointsArray (destination !) points --build a new array within defaults by taking all points and moving them to their destination index we calculated with the crazy destination function above
+
+    existingFlags = zipWith (||) headFlags isFurthestPoint --combine the existing headflags with our newly calculated furthestpoints. All of these points are part of the hull so we make them new flags.
+    newFlags = permute (||) defaultFlagsArray (destination !) existingFlags --permute/shuffle the flags in the way we calculated in the destination function
 
   --error "TODO: partition"
   --we have initial partition with p1 to p2 and p2 to p1. 
@@ -243,13 +279,23 @@ partition (T2 headFlags points) = T2 newFlags newPoints
   --Then pretty much copy the logic of the initial partition
 
 
-
 -- The completed algorithm repeatedly partitions the points until there are
 -- no undecided points remaining. What remains is the convex hull.
 --
 quickhull :: Acc (Vector Point) -> Acc (Vector Point)
-quickhull =
-  error "TODO: quickhull"
+quickhull points = p
+  where
+    initialPart = initialPartition points
+
+    condition :: Acc SegmentedPoints -> Acc (Scalar Bool)
+    condition (T2 flag _) = fold (||) (lift False) (map not flag) --check if all flags are True. If they are not we are not done yet
+
+    finalState = awhile condition partition initialPart
+    
+    T2 _ p = finalState
+
+    --result = partition initialPart
+--We need to initialize the array with our initialize function, and then keep calling partition untill there are no undecided points left.
 
 
 -- Helper functions
