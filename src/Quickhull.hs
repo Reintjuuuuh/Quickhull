@@ -122,14 +122,14 @@ initialPartition points =
               check :: Exp DIM1 -> Exp Point
               check ix = result
                 where
-                  Z :. i = unlift ix
+                  I1 i = ix
 
                   result = --just a small hardcoded check for placing p1 and p2 in the right places
                     if i == 0 || i == (totalUpper + totalLower + 2)
                       then p1
                       else if i == (totalUpper + 1)
                         then p2
-                        else lift ((0,0) :: Point) --placeholder. Will get overwritten
+                        else T2 0 0 --placeholder. Will get overwritten
 
       headFlags :: Acc (Vector Bool) --pretty much the same logic as for making the newpoints array. We just place a True at p1 and p2 and p1 again, and false everywhere else.
       headFlags = generate (I1 arrayLength) check
@@ -142,12 +142,12 @@ initialPartition points =
               check :: Exp DIM1 -> Exp Bool
               check ix = result
                 where
-                  Z :. i = unlift ix
+                  I1 i = ix
 
                   result =
                     if i == 0 || i == (totalUpper + 1) || i == (totalUpper + totalLower + 2)
-                      then lift (True :: Bool)
-                      else lift (False :: Bool)
+                      then True_
+                      else False_
   in
   T2 headFlags newPoints
 
@@ -290,7 +290,7 @@ quickhull points = init p
     initialPart = initialPartition points
 
     condition :: Acc SegmentedPoints -> Acc (Scalar Bool)
-    condition (T2 flag _) = fold (||) (lift False) (map not flag) --check if all flags are True. If they are not we are not done yet
+    condition (T2 flag _) = fold (||) False_ (map not flag) --check if all flags are True. If they are not we are not done yet
 
     finalState = awhile condition partition initialPart
     
@@ -345,7 +345,7 @@ propagateR flagsMat valuesMat = map snd scannedElements --return all second elem
 shiftHeadFlagsL :: Acc (Vector Bool) -> Acc (Vector Bool)
 shiftHeadFlagsL flags = generate (shape flags) $ \ix ->
   let
-    Z :. i = unlift ix
+    I1 i = ix
     n = length flags
   in
     if i == n - 1
@@ -372,7 +372,7 @@ shiftHeadFlagsL flags = generate (shape flags) $ \ix ->
 shiftHeadFlagsR :: Acc (Vector Bool) -> Acc (Vector Bool) --see shiftL
 shiftHeadFlagsR flags = generate (shape flags) $ \ix ->
   let
-    Z :. i = unlift ix
+    I1 i = ix
   in
     if i == 0 
       then True_ 
