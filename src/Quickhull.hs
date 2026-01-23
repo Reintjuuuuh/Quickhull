@@ -164,6 +164,8 @@ initialPartition points =
 partition :: Acc SegmentedPoints -> Acc SegmentedPoints
 partition (T2 headFlags points) = T2 newFlags newPoints
   where    
+    endFlags = shiftHeadFlagsL headFlags
+
     p1s = propagateL headFlags points
     p2s = propagateR headFlags points
     --now we have for every point the line to which they should calculate their distance
@@ -181,7 +183,7 @@ partition (T2 headFlags points) = T2 newFlags newPoints
         func :: Exp Point -> Exp Point -> Exp Int
         func (T2 x1 y1) (T2 x y) = (x - x1) * (x - x1) + (y - y1) * (y - y1)
 
-    tempMaximum = segmentedScanr1 func headFlags (zip3 distancesToLine points distancesToPoint)
+    tempMaximum = segmentedScanr1 func endFlags (zip3 distancesToLine points distancesToPoint)
       where
         func :: Exp (Int, Point, Int) -> Exp (Int, Point, Int) -> Exp (Int, Point, Int)
         func p1@(T3 d1 _ dp1) p2@(T3 d2 _ dp2) = if d1 > d2 || (d1 == d2 && dp1 < dp2) then p1 else p2 
@@ -230,8 +232,8 @@ partition (T2 headFlags points) = T2 newFlags newPoints
     upperLocalID = segmentedScanl1 (+) headFlags (map boolToInt upperKeep)
     lowerLocalID = segmentedScanl1 (+) headFlags (map boolToInt lowerKeep)
 
-    upperCounts = propagateL headFlags (segmentedScanr1 (+) headFlags (map boolToInt upperKeep)) --for the offset
-    lowerCounts = propagateL headFlags (segmentedScanr1 (+) headFlags (map boolToInt lowerKeep))
+    upperCounts = propagateL headFlags (segmentedScanr1 (+) endFlags (map boolToInt upperKeep)) --for the offset
+    lowerCounts = propagateL headFlags (segmentedScanr1 (+) endFlags (map boolToInt lowerKeep))
 
     segmentSizes = zipWith4 func headFlags upperCounts lowerCounts isActive --same for lower
       where
