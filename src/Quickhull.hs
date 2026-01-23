@@ -62,8 +62,8 @@ initialPartition :: Acc (Vector Point) -> Acc SegmentedPoints
 initialPartition points =
   let
       p1, p2 :: Exp Point
-      p1 = the (fold1 (\point1@(T2 x1 _) point2@(T2 x2 _) -> if x1 < x2 then point1 else point2) points) --weird lambda function that compares two points and picks the one with the lowest x value. "the" is needed for type issues.
-      p2 = the (fold1 (\point1@(T2 x1 _) point2@(T2 x2 _) -> if x1 > x2 then point1 else point2) points)
+      p1 = the (fold1 (\point1@(T2 x1 y1) point2@(T2 x2 y2) -> if x1 < x2 then point1 else if x1 > x2 then point2 else if y1 < y2 then point1 else point2) points) --weird lambda function that compares two points and picks the one with the lowest x value. "the" is needed for type issues.
+      p2 = the (fold1 (\point1@(T2 x1 y1) point2@(T2 x2 y2) -> if x1 > x2 then point1 else if x1 < x2 then point2 else if y1 > y2 then point1 else point2) points)
 
       isUpper :: Acc (Vector Bool)
       isUpper = map (pointIsLeftOfLine line) points
@@ -283,7 +283,7 @@ partition (T2 headFlags points) = T2 newFlags newPoints
 -- no undecided points remaining. What remains is the convex hull.
 --
 quickhull :: Acc (Vector Point) -> Acc (Vector Point)
-quickhull points = p
+quickhull points = init p
   where
     initialPart = initialPartition points
 
@@ -341,16 +341,26 @@ propagateR flagsMat valuesMat = map snd scannedElements --return all second elem
 -- should be:
 -- Vector (Z :. 6) [False,False,True,False,True,True]
 shiftHeadFlagsL :: Acc (Vector Bool) -> Acc (Vector Bool)
-shiftHeadFlagsL mat = backpermute (shape mat) getIndex mat --backpermute is like a shuffle for a matrix, so it just creates a new matrix using a function that says at what index of the matrix it should get its data from
-  where
-    getIndex :: Exp DIM1 -> Exp DIM1
-    getIndex ix = lift (Z :. sourceIndex) --we return a new index; the index where the data should come from
-      where
-        Z :. i = unlift ix
+shiftHeadFlagsL flags = generate (shape flags) $ \ix ->
+  let
+    Z :. i = unlift ix
+    n = length flags
+  in
+    if i == n - 1
+      then True_ 
+      else flags ! I1 (i + 1)
 
-        len = length mat
+--wrong implementation that copies the last value instead of writing true:
+-- shiftHeadFlagsL mat = backpermute (shape mat) getIndex mat --backpermute is like a shuffle for a matrix, so it just creates a new matrix using a function that says at what index of the matrix it should get its data from
+--   where
+--     getIndex :: Exp DIM1 -> Exp DIM1
+--     getIndex ix = lift (Z :. sourceIndex) --we return a new index; the index where the data should come from
+--       where
+--         Z :. i = unlift ix
 
-        sourceIndex = if i == (len - 1) then i else i + 1 --the index is pretty much the next index (because we're shifting left, we need to look at the +1 index from the original array). If the index gets out of bounds it just copies the last index
+--         len = length mat
+
+--         sourceIndex = if i == (len - 1) then i else i + 1 --the index is pretty much the next index (because we're shifting left, we need to look at the +1 index from the original array). If the index gets out of bounds it just copies the last index
 
 -- >>> import Data.Array.Accelerate.Interpreter
 -- >>> run $ shiftHeadFlagsR (use (fromList (Z :. 6) [True,False,False,True,False,False]))
@@ -358,14 +368,23 @@ shiftHeadFlagsL mat = backpermute (shape mat) getIndex mat --backpermute is like
 -- should be:
 -- Vector (Z :. 6) [True,True,False,False,True,False]
 shiftHeadFlagsR :: Acc (Vector Bool) -> Acc (Vector Bool) --see shiftL
-shiftHeadFlagsR mat = backpermute (shape mat) getIndex mat
-  where
-    getIndex :: Exp DIM1 -> Exp DIM1
-    getIndex ix = lift (Z :. sourceIndex)
-      where
-        Z :. i = unlift ix
+shiftHeadFlagsR flags = generate (shape flags) $ \ix ->
+  let
+    Z :. i = unlift ix
+  in
+    if i == 0 
+      then True_ 
+      else flags ! I1 (i - 1)
 
-        sourceIndex = if i == 0 then i else i - 1 --see shiftL, with the difference that we copy the first element instead of the last for shifting right
+--also initial wrong implementation
+-- shiftHeadFlagsR mat = backpermute (shape mat) getIndex mat
+--   where
+--     getIndex :: Exp DIM1 -> Exp DIM1
+--     getIndex ix = lift (Z :. sourceIndex)
+--       where
+--         Z :. i = unlift ix
+
+--         sourceIndex = if i == 0 then i else i - 1 --see shiftL, with the difference that we copy the first element instead of the last for shifting right
 
 -- >>> import Data.Array.Accelerate.Interpreter
 -- >>> let flags  = fromList (Z :. 9) [True,False,False,True,True,False,False,False,True]
@@ -399,7 +418,7 @@ segmentedScanr1 func flagsMat valuesMat = map snd scannedElements --return all s
   where
     combined = zip flagsMat valuesMat
 
-    scannedElements = scanr1 (segmented func) combined --we use helper function segmented which already has the logic for looking if the flag is true or not.
+    scannedElements = scanr1 (segmentedR func) combined --we use helper function segmented which already has the logic for looking if the flag is true or not.
 
 -- Given utility functions
 -- -----------------------
@@ -420,6 +439,9 @@ nonNormalizedDistance (T2 (T2 x1 y1) (T2 x2 y2)) (T2 x y) = nx * x + ny * y - c
 
 segmented :: Elt a => (Exp a -> Exp a -> Exp a) -> Exp (Bool, a) -> Exp (Bool, a) -> Exp (Bool, a)
 segmented f (T2 aF aV) (T2 bF bV) = T2 (aF || bF) (if bF then bV else f aV bV)
+
+segmentedR :: Elt a => (Exp a -> Exp a -> Exp a) -> Exp (Bool, a) -> Exp (Bool, a) -> Exp (Bool, a)
+segmentedR f (T2 aF aV) (T2 bF bV) = T2 (aF || bF) (if aF then aV else f aV bV) --almost the same but different for shifting right
 
 -- | Read a file (such as "inputs/1.dat") and return a vector of points,
 -- suitable as input to 'quickhull' or 'initialPartition'. Not to be used in
