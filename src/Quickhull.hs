@@ -80,7 +80,7 @@ initialPartition points =
       countUpper  :: Acc (Scalar Int)
       T2 offsetUpper countUpper = T2 offset count --we combine the offsets and total count as a tuple with T2
         where
-          isUpper' = map (\a -> if a then 1 else 0) isUpper --need to convert all Trues and Falses to 1's and 0's
+          isUpper' = map boolToInt isUpper --need to convert all Trues and Falses to 1's and 0's
 
           array = scanl (+) 0 isUpper' --scan to build up an array
           offset = init array --delete the last element
@@ -90,7 +90,7 @@ initialPartition points =
       countLower  :: Acc (Scalar Int)
       T2 offsetLower countLower = T2 offset count --pretty much the same as the function above, just for the lower points
         where
-          isLower' = map (\a -> if a then 1 else 0) isLower
+          isLower' = map boolToInt isLower
 
           array = scanl (+) 0 isLower'
           offset = init array
@@ -104,10 +104,10 @@ initialPartition points =
           calcIndex :: Exp Bool -> Exp Bool -> Exp Int -> Exp Int -> Exp (Maybe DIM1)
           calcIndex upperPoints lowerPoints upperOffset lowerOffset =
             if upperPoints
-              then lift (Just (Z :. upperOffset + 1)) -- +1 because we have to start (and end) the partition with p1 as the excercise says. Dont know why, but doing it anyway
+              then Just_ (I1 (upperOffset + 1)) -- +1 because we have to start (and end) the partition with p1 as the excercise says. Dont know why, but doing it anyway
               else if lowerPoints
-                then lift (Just (Z :. lowerOffset + totalUpperPoints + 2 )) --we have the loweroffset, plus the total amount of upperpoints, plus 2 for p1 and p2 on the line
-                else lift (Nothing :: Maybe DIM1)
+                then Just_ (I1 (lowerOffset + totalUpperPoints + 2 )) --we have the loweroffset, plus the total amount of upperpoints, plus 2 for p1 and p2 on the line
+                else Nothing_
 
       newPoints :: Acc (Vector Point)
       newPoints = permute const defaults (destination !) points --build a new array within defaults by taking all points and moving them to their destination index
@@ -162,7 +162,7 @@ initialPartition points =
 -- These points are undecided.
 --
 partition :: Acc SegmentedPoints -> Acc SegmentedPoints
-partition (T2 headFlags points) = undefined
+partition (T2 headFlags points) = T2 newFlags newPoints
   where    
     p1s = propagateL headFlags points
     p2s = propagateR headFlags points
@@ -187,6 +187,7 @@ partition (T2 headFlags points) = undefined
         func p1@(T3 d1 _ dp1) p2@(T3 d2 _ dp2) = if d1 > d2 || (d1 == d2 && dp1 < dp2) then p1 else p2 
 
     realMaximum = map (\(T3 _ p _) -> p) (propagateL headFlags tempMaximum) --now every point knows the furthest point in their segment
+    maxDist = map (\(T3 d _ _) -> d) (propagateL headFlags tempMaximum)
 
     --we now have, for every point, the p1 and p2 in their segment (line) and the furthest away point in their segment.
 
@@ -200,12 +201,7 @@ partition (T2 headFlags points) = undefined
         func :: Exp Point -> Exp Point -> Exp Point -> Exp Bool
         func p2 p3 = pointIsLeftOfLine (T2 p3 p2) 
 
-    upperLocalID = segmentedScanl1 (+) headFlags (map boolToInt isUpper)
-    lowerLocalID = segmentedScanl1 (+) headFlags (map boolToInt isLower)
-
-    upperCounts = propagateL headFlags (segmentedScanr1 (+) headFlags (map boolToInt isUpper)) 
-    lowerCounts = propagateL headFlags (segmentedScanr1 (+) headFlags (map boolToInt isLower))
-
+    isActive = map (>0) maxDist
     -- undecidedPoints = zipWith4 func p1s p2s realMaximum points 
     --   where
     --     func :: Exp Point -> Exp Point -> Exp Point -> Exp Point -> Exp Bool
@@ -214,9 +210,31 @@ partition (T2 headFlags points) = undefined
     --         then lift (True :: Bool)
     --         else lift (False :: Bool)
 
-    --now all points with True still need to be handled. We do this by partitioning again.
+    --now all points with True still need to be handled.
 
+    isFurthestPoint = zipWith4 func headFlags isActive points realMaximum --make an array that tells every point if they are the furthest point or not
+      where
+        func :: Exp Bool -> Exp Bool -> Exp Point -> Exp Point -> Exp Bool
+        func hf isAct (T2 x1 y1) (T2 x2 y2) = not hf && isAct && x1 == x2 && y1 == y2
 
+    upperKeep = zipWith4 func headFlags isActive isFurthestPoint isUpper --make an array that flags every point that is an upper point and that we need to keep. This means we exclude headflags and the furthest point 
+      where
+        func :: Exp Bool -> Exp Bool -> Exp Bool -> Exp Bool -> Exp Bool
+        func hf isAct furthest upper = not hf && isAct && not furthest && upper
+
+    lowerKeep = zipWith4 func headFlags isActive isFurthestPoint isLower --same for lower
+      where
+        func :: Exp Bool -> Exp Bool -> Exp Bool -> Exp Bool -> Exp Bool
+        func hf isAct furthest lower = not hf && isAct && not furthest && lower
+
+    upperLocalID = segmentedScanl1 (+) headFlags (map boolToInt upperKeep)
+    lowerLocalID = segmentedScanl1 (+) headFlags (map boolToInt lowerKeep)
+
+    upperCounts = propagateL headFlags (segmentedScanr1 (+) headFlags (map boolToInt upperKeep)) --for the offset
+    lowerCounts = propagateL headFlags (segmentedScanr1 (+) headFlags (map boolToInt lowerKeep))
+
+    newFlags = undefined
+    newPoints = undefined
 
 
   --error "TODO: partition"
